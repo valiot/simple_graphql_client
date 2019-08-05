@@ -9,7 +9,8 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
   def start_link do
     state = %{
       socket: WebSocket,
-      subscriptions: %{}
+      subscriptions: %{},
+      queries: %{}
     }
 
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
@@ -28,15 +29,16 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
 
   def handle_cast(
         {:subscribe, subscription_name, callback_or_dest, query, variables},
-        %{socket: socket, subscriptions: subscriptions} = state
+        %{socket: socket, subscriptions: subscriptions, queries: queries} = state
       ) do
     WebSocket.subscribe(socket, self(), subscription_name, query, variables)
 
     callbacks = Map.get(subscriptions, subscription_name, [])
     subscriptions = Map.put(subscriptions, subscription_name, [callback_or_dest | callbacks])
+    queries = Map.put(queries, subscription_name, [query, variables])
     state = Map.put(state, :subscriptions, subscriptions)
 
-    {:noreply, state}
+    {:noreply, %{state | queries: queries, subscriptions: subscriptions}}
   end
 
   # Incoming Notifications (from SimpleGraphqlClient.WebSocket)
@@ -51,7 +53,12 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
     {:noreply, state}
   end
 
-  def handle_cast({:joined}, state) do
+  def handle_cast(:joined, %{socket: socket, queries: queries} = state) do
+    # Resend subscription request.
+    Enum.each(queries, fn {subscription_name, [query, variables]} ->
+      WebSocket.subscribe(socket, self(), subscription_name, query, variables)
+    end)
+
     {:noreply, state}
   end
 
@@ -59,7 +66,7 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
     if is_function(callback_or_dest) do
       callback_or_dest.(response)
     else
-      send(callback_or_dest, response)
+      send(callback_or_dest, {:subscription, response})
     end
   end
 end

@@ -1,4 +1,4 @@
-# original source code at https://github.com/annkissam/absinthe_websocket/blob/master/lib/absinthe_websocket/websocket.ex 
+# original source code at https://github.com/annkissam/absinthe_websocket/blob/master/lib/absinthe_websocket/websocket.ex
 # Credentials goes to github.com/annkissam
 defmodule SimpleGraphqlClient.WebSocket do
   @moduledoc """
@@ -40,8 +40,8 @@ defmodule SimpleGraphqlClient.WebSocket do
     WebSockex.cast(socket, {:subscribe, {pid, subscription_name, query, variables}})
   end
 
-  def handle_connect(_conn, %{socket: socket} = state) do
-    # Logger.info "#{__MODULE__} - Connected: #{inspect conn}"
+  def handle_connect(conn, %{socket: socket} = state) do
+    Logger.info("#{__MODULE__} - Connected: #{inspect(conn)}")
 
     WebSockex.cast(socket, {:join})
 
@@ -194,9 +194,7 @@ defmodule SimpleGraphqlClient.WebSocket do
     handle_msg(msg, state)
   end
 
-  def handle_msg(%{"event" => "phx_reply", "payload" => payload, "ref" => msg_ref}, state) do
-    # Logger.info "#{__MODULE__} - Reply: #{inspect msg}"
-
+  def handle_msg(%{"event" => "phx_reply", "payload" => payload, "ref" => msg_ref} = msg, state) do
     queries = state.queries
     {command, queries} = Map.pop(queries, msg_ref)
     state = Map.put(state, :queries, queries)
@@ -232,7 +230,9 @@ defmodule SimpleGraphqlClient.WebSocket do
             raise "Join Error - #{inspect(payload)}"
           end
 
-          GenServer.cast(state.subscription_server, {:joined})
+          Logger.debug("#{__MODULE__} - Join: #{inspect(msg)}")
+
+          GenServer.cast(state.subscription_server, :joined)
 
           state
 

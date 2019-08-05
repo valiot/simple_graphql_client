@@ -7,7 +7,7 @@ defmodule SimpleGraphqlClient.Subscriber do
   @doc """
    Handles absinthe subscription with help of Subscritpion genserver.
   """
-  def absinthe_sub(query, variables, callback_or_dest, opts) do
+  def absinthe_sub(query, variables, callback_or_dest, _opts) do
     SubscriptionServer.subscribe(
       get_subscription_name(query),
       callback_or_dest,
