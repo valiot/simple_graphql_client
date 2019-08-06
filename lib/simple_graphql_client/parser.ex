@@ -8,7 +8,7 @@ defmodule SimpleGraphqlClient.Parser do
   def parse_response({:ok, %{status_code: 200} = resp}) do
     {:ok,
      %Response{
-       body: Poison.decode(resp.body),
+       body: Poison.decode!(resp.body),
        status_code: resp.status_code,
        headers: resp.headers
      }}
