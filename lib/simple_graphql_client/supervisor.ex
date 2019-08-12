@@ -12,11 +12,13 @@ defmodule SimpleGraphqlClient.Supervisor do
 
   def init(args) do
     ws_url = Keyword.get(args, :ws_url)
+    extra_headers = Keyword.get(args, :extra_headers, [])
+    connection_params = Keyword.get(args, :connection_params, [])
 
     children = [
       worker(SubscriptionServer, []),
       worker(WebSocket, [
-        [ws_url: ws_url]
+        [ws_url: ws_url, extra_headers: extra_headers, connection_params: connection_params]
       ])
     ]
 
