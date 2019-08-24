@@ -1,4 +1,4 @@
-# original source code at https://github.com/annkissam/absinthe_websocket/blob/master/lib/absinthe_websocket/websocket.ex 
+# original source code at https://github.com/annkissam/absinthe_websocket/blob/master/lib/absinthe_websocket/websocket.ex
 # Credentials goes to github.com/annkissam
 defmodule SimpleGraphqlClient.WebSocket do
   @moduledoc """
@@ -15,9 +15,13 @@ defmodule SimpleGraphqlClient.WebSocket do
     name = __MODULE__
 
     ws_url = Keyword.get(args, :ws_url)
+    extra_headers = Keyword.get(args, :extra_headers, [])
+    connection_params = Keyword.get(args, :connection_params, [])
 
     state = %{
       subscriptions: %{},
+      protocol: get_new_protocol(extra_headers),
+      connection_params: connection_params,
       queries: %{},
       msg_ref: 0,
       heartbeat_timer: nil,
@@ -28,6 +32,7 @@ defmodule SimpleGraphqlClient.WebSocket do
     WebSockex.start_link(ws_url, __MODULE__, state,
       handle_initial_conn_failure: true,
       async: true,
+      extra_headers: extra_headers,
       name: name
     )
   end
@@ -40,10 +45,18 @@ defmodule SimpleGraphqlClient.WebSocket do
     WebSockex.cast(socket, {:subscribe, {pid, subscription_name, query, variables}})
   end
 
-  def handle_connect(_conn, %{socket: socket} = state) do
-    # Logger.info "#{__MODULE__} - Connected: #{inspect conn}"
+  # graphql-ws protocol
+  def handle_connect(_conn, %{socket: socket, protocol: "graphql-ws"} = state) do
+    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_INIT: #{inspect(conn)}")
+    WebSockex.cast(socket, :connection_init)
+    {:ok, state}
+  end
 
-    WebSockex.cast(socket, {:join})
+  # default Websocket protocol
+  def handle_connect(_conn, %{socket: socket} = state) do
+    # Logger.info("(#{__MODULE__}) - Connected: #{inspect(conn)}")
+
+    WebSockex.cast(socket, :join)
 
     # Send a heartbeat
     heartbeat_timer = Process.send_after(self(), :heartbeat, @heartbeat_sleep)
@@ -52,8 +65,15 @@ defmodule SimpleGraphqlClient.WebSocket do
     {:ok, state}
   end
 
+  def handle_disconnect(map, %{protocol: "graphql-ws"} = state) do
+    Logger.warn("(#{__MODULE__}) - Disconnected: #{inspect(map)}")
+    :timer.sleep(@disconnect_sleep)
+    {:reconnect, state}
+  end
+
+  # default Websocket protocol
   def handle_disconnect(map, %{heartbeat_timer: heartbeat_timer} = state) do
-    Logger.error("#{__MODULE__} - Disconnected: #{inspect(map)}")
+    Logger.error("(#{__MODULE__}) - Disconnected: #{inspect(map)}")
 
     if heartbeat_timer do
       :timer.cancel(heartbeat_timer)
@@ -66,23 +86,48 @@ defmodule SimpleGraphqlClient.WebSocket do
     {:reconnect, state}
   end
 
-  def handle_info(:heartbeat, %{socket: socket} = state) do
-    WebSockex.cast(socket, {:heartbeat})
+  def handle_cast(:connection_init, %{connection_params: connection_params} = state) do
+    msg =
+      %{
+        "type" => "connection_init",
+        "payload" => connection_params
+      }
+      |> Poison.encode!()
 
-    # Send another heartbeat
-    heartbeat_timer = Process.send_after(self(), :heartbeat, @heartbeat_sleep)
-    state = Map.put(state, :heartbeat_timer, heartbeat_timer)
-
-    {:ok, state}
+    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_INIT: #{inspect(msg)}")
+    {:reply, {:text, msg}, state}
   end
 
-  def handle_info(msg, state) do
-    Logger.info("#{__MODULE__} Info - Message: #{inspect(msg)}")
+  def handle_cast(
+        {:subscribe, {pid, subscription_name, query, variables}},
+        %{msg_ref: msg_ref, protocol: "graphql-ws"} = state
+      ) do
+    msg =
+      %{
+        "id" => "#{msg_ref}",
+        "type" => "start",
+        "payload" => %{
+          "variables" => variables,
+          "extensions" => %{},
+          "operationName" => nil,
+          "query" => query
+        }
+      }
+      |> Poison.encode!()
 
-    {:ok, state}
+    # Logger.debug("(#{__MODULE__}) - QL_START: #{inspect(msg)}")
+
+    subscriptions = Map.put(state.subscriptions, "#{msg_ref}", {pid, subscription_name})
+
+    state =
+      state
+      |> Map.put(:subscriptions, subscriptions)
+      |> Map.put(:msg_ref, msg_ref + 1)
+
+    {:reply, {:text, msg}, state}
   end
 
-  def handle_cast({:join}, %{queries: queries, msg_ref: msg_ref} = state) do
+  def handle_cast(:join, %{queries: queries, msg_ref: msg_ref} = state) do
     msg =
       %{
         topic: "__absinthe__:control",
@@ -92,7 +137,7 @@ defmodule SimpleGraphqlClient.WebSocket do
       }
       |> Poison.encode!()
 
-    queries = Map.put(queries, msg_ref, {:join})
+    queries = Map.put(queries, msg_ref, :join)
 
     state =
       state
@@ -104,7 +149,7 @@ defmodule SimpleGraphqlClient.WebSocket do
 
   # Heartbeat: http://graemehill.ca/websocket-clients-and-phoenix-channels/
   # https://stackoverflow.com/questions/34948331/how-to-implement-a-resetable-countdown-timer-with-a-genserver-in-elixir-or-erlan
-  def handle_cast({:heartbeat}, %{queries: queries, msg_ref: msg_ref} = state) do
+  def handle_cast(:heartbeat, %{queries: queries, msg_ref: msg_ref} = state) do
     msg =
       %{
         topic: "phoenix",
@@ -114,7 +159,7 @@ defmodule SimpleGraphqlClient.WebSocket do
       }
       |> Poison.encode!()
 
-    queries = Map.put(queries, msg_ref, {:heartbeat})
+    queries = Map.put(queries, msg_ref, :heartbeat)
 
     state =
       state
@@ -180,23 +225,45 @@ defmodule SimpleGraphqlClient.WebSocket do
     {:reply, {:text, msg}, state}
   end
 
-  def handle_cast(message, state) do
-    Logger.info("#{__MODULE__} - Cast: #{inspect(message)}")
+  def handle_info(:heartbeat, %{socket: socket} = state) do
+    WebSockex.cast(socket, :heartbeat)
 
-    super(message, state)
+    # Send another heartbeat
+    heartbeat_timer = Process.send_after(self(), :heartbeat, @heartbeat_sleep)
+    state = Map.put(state, :heartbeat_timer, heartbeat_timer)
+
+    {:ok, state}
   end
 
-  def handle_frame({:text, msg}, state) do
-    msg =
-      msg
-      |> Poison.decode!()
-
-    handle_msg(msg, state)
+  def handle_info(_msg, state) do
+    # Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
+    {:ok, state}
   end
 
-  def handle_msg(%{"event" => "phx_reply", "payload" => payload, "ref" => msg_ref}, state) do
-    # Logger.info "#{__MODULE__} - Reply: #{inspect msg}"
+  def handle_msg(
+        %{"payload" => payload, "id" => subscription_id} = _msg,
+        %{subscriptions: subscriptions} = state
+      ) do
+    {pid, subscription_name} = Map.get(subscriptions, subscription_id)
+    # Logger.debug("(#{__MODULE__}) GQL_DATA - Message: #{inspect(msg)}")
 
+    GenServer.cast(pid, {:subscription, subscription_name, payload})
+
+    {:ok, state}
+  end
+
+  def handle_msg(%{"type" => "ka"}, state) do
+    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_KEEP_ALIVE")
+    {:ok, state}
+  end
+
+  def handle_msg(%{"type" => "connection_ack"}, state) do
+    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_ACK")
+    {:ok, state}
+  end
+
+  def handle_msg(%{"event" => "phx_reply", "payload" => payload, "ref" => msg_ref} = msg, state) do
+    # Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
     queries = state.queries
     {command, queries} = Map.pop(queries, msg_ref)
     state = Map.put(state, :queries, queries)
@@ -227,16 +294,18 @@ defmodule SimpleGraphqlClient.WebSocket do
           subscriptions = Map.put(state.subscriptions, subscription_id, {pid, subscription_name})
           Map.put(state, :subscriptions, subscriptions)
 
-        {:join} ->
+        :join ->
           unless status == :ok do
             raise "Join Error - #{inspect(payload)}"
           end
 
-          GenServer.cast(state.subscription_server, {:joined})
+          Logger.debug("(#{__MODULE__}) - Join: #{inspect(msg)}")
+
+          GenServer.cast(state.subscription_server, :joined)
 
           state
 
-        {:heartbeat} ->
+        :heartbeat ->
           unless status == :ok do
             raise "Heartbeat Error - #{inspect(payload)}"
           end
@@ -248,10 +317,12 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(
-        %{"event" => "subscription:data", "payload" => payload, "topic" => subscription_id},
+        %{"event" => "subscription:data", "payload" => payload, "topic" => subscription_id} =
+          _msg,
         %{subscriptions: subscriptions} = state
       ) do
     {pid, subscription_name} = Map.get(subscriptions, subscription_id)
+    # Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
 
     data = payload["result"]["data"]
 
@@ -261,8 +332,29 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(msg, state) do
-    Logger.info("#{__MODULE__} - Msg: #{inspect(msg)}")
+    Logger.info("(#{__MODULE__}) - Msg: #{inspect(msg)}")
 
     {:ok, state}
   end
+
+  def handle_frame({:text, msg}, state) do
+    msg =
+      msg
+      |> Poison.decode!()
+
+    handle_msg(msg, state)
+  end
+
+  def get_new_protocol(extra_headers) do
+    Enum.reduce(extra_headers, nil, fn {key, value}, acc ->
+      if key == "Sec-WebSocket-Protocol",
+        do: value,
+        else: acc
+    end)
+  end
+
+  # def handle_cast(message, state) do
+  #   Logger.info("(#{__MODULE__}) - Cast: #{inspect(message)}")
+  #   super(message, state)
+  # end
 end
