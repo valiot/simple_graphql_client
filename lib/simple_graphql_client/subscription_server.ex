@@ -31,10 +31,18 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
         {:subscribe, subscription_name, callback_or_dest, query, variables},
         %{socket: socket, subscriptions: subscriptions, queries: queries} = state
       ) do
-    WebSocket.subscribe(socket, self(), subscription_name, query, variables)
+    actual_suscriptions = Map.keys(subscriptions)
+
+    unless subscription_name in actual_suscriptions,
+      do: WebSocket.subscribe(socket, self(), subscription_name, query, variables)
 
     callbacks = Map.get(subscriptions, subscription_name, [])
-    subscriptions = Map.put(subscriptions, subscription_name, [callback_or_dest | callbacks])
+
+    subscriptions =
+      unless callback_or_dest in callbacks,
+        do: Map.put(subscriptions, subscription_name, [callback_or_dest | callbacks]),
+        else: subscriptions
+
     queries = Map.put(queries, subscription_name, [query, variables])
     state = Map.put(state, :subscriptions, subscriptions)
 

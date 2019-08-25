@@ -241,6 +241,18 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(
+        %{"payload" => %{"data" => payload}, "id" => subscription_id} = _msg,
+        %{subscriptions: subscriptions} = state
+      ) do
+    {pid, subscription_name} = Map.get(subscriptions, subscription_id)
+    # Logger.debug("(#{__MODULE__}) GQL_DATA - Message: #{inspect(msg)}")
+
+    GenServer.cast(pid, {:subscription, subscription_name, payload})
+
+    {:ok, state}
+  end
+
+  def handle_msg(
         %{"payload" => payload, "id" => subscription_id} = _msg,
         %{subscriptions: subscriptions} = state
       ) do
@@ -258,6 +270,7 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(%{"type" => "connection_ack"}, state) do
+    GenServer.cast(state.subscription_server, :joined)
     # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_ACK")
     {:ok, state}
   end
