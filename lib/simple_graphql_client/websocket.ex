@@ -46,15 +46,15 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   # graphql-ws protocol
-  def handle_connect(_conn, %{socket: socket, protocol: "graphql-ws"} = state) do
-    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_INIT: #{inspect(conn)}")
+  def handle_connect(conn, %{socket: socket, protocol: "graphql-ws"} = state) do
+    Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_INIT: #{inspect(conn)}")
     WebSockex.cast(socket, :connection_init)
     {:ok, state}
   end
 
   # default Websocket protocol
-  def handle_connect(_conn, %{socket: socket} = state) do
-    # Logger.info("(#{__MODULE__}) - Connected: #{inspect(conn)}")
+  def handle_connect(conn, %{socket: socket} = state) do
+    Logger.info("(#{__MODULE__}) - Connected: #{inspect(conn)}")
 
     WebSockex.cast(socket, :join)
 
@@ -66,7 +66,7 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_disconnect(map, %{protocol: "graphql-ws"} = state) do
-    Logger.warn("(#{__MODULE__}) - Disconnected: #{inspect(map)}")
+    Logger.error("(#{__MODULE__}) - Disconnected: #{inspect(map)}")
     :timer.sleep(@disconnect_sleep)
     {:reconnect, state}
   end
@@ -94,7 +94,7 @@ defmodule SimpleGraphqlClient.WebSocket do
       }
       |> Poison.encode!()
 
-    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_INIT: #{inspect(msg)}")
+    Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_INIT: #{inspect(msg)}")
     {:reply, {:text, msg}, state}
   end
 
@@ -115,7 +115,7 @@ defmodule SimpleGraphqlClient.WebSocket do
       }
       |> Poison.encode!()
 
-    # Logger.debug("(#{__MODULE__}) - QL_START: #{inspect(msg)}")
+    Logger.debug("(#{__MODULE__}) - QL_START: #{inspect(msg)}")
 
     subscriptions = Map.put(state.subscriptions, "#{msg_ref}", {pid, subscription_name})
 
@@ -235,17 +235,17 @@ defmodule SimpleGraphqlClient.WebSocket do
     {:ok, state}
   end
 
-  def handle_info(_msg, state) do
-    # Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
+  def handle_info(msg, state) do
+    Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
     {:ok, state}
   end
 
   def handle_msg(
-        %{"payload" => %{"data" => payload}, "id" => subscription_id} = _msg,
+        %{"payload" => %{"data" => payload}, "id" => subscription_id} = msg,
         %{subscriptions: subscriptions} = state
       ) do
     {pid, subscription_name} = Map.get(subscriptions, subscription_id)
-    # Logger.debug("(#{__MODULE__}) GQL_DATA - Message: #{inspect(msg)}")
+    Logger.debug("(#{__MODULE__}) GQL_DATA - Message: #{inspect(msg)}")
 
     GenServer.cast(pid, {:subscription, subscription_name, payload})
 
@@ -253,11 +253,11 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(
-        %{"payload" => payload, "id" => subscription_id} = _msg,
+        %{"payload" => payload, "id" => subscription_id} = msg,
         %{subscriptions: subscriptions} = state
       ) do
     {pid, subscription_name} = Map.get(subscriptions, subscription_id)
-    # Logger.debug("(#{__MODULE__}) GQL_DATA - Message: #{inspect(msg)}")
+    Logger.debug("(#{__MODULE__}) GQL_DATA - Message: #{inspect(msg)}")
 
     GenServer.cast(pid, {:subscription, subscription_name, payload})
 
@@ -265,18 +265,18 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(%{"type" => "ka"}, state) do
-    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_KEEP_ALIVE")
+    Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_KEEP_ALIVE")
     {:ok, state}
   end
 
   def handle_msg(%{"type" => "connection_ack"}, state) do
     GenServer.cast(state.subscription_server, :joined)
-    # Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_ACK")
+    Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_ACK")
     {:ok, state}
   end
 
   def handle_msg(%{"event" => "phx_reply", "payload" => payload, "ref" => msg_ref} = msg, state) do
-    # Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
+    Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
     queries = state.queries
     {command, queries} = Map.pop(queries, msg_ref)
     state = Map.put(state, :queries, queries)
@@ -331,11 +331,11 @@ defmodule SimpleGraphqlClient.WebSocket do
 
   def handle_msg(
         %{"event" => "subscription:data", "payload" => payload, "topic" => subscription_id} =
-          _msg,
+          msg,
         %{subscriptions: subscriptions} = state
       ) do
     {pid, subscription_name} = Map.get(subscriptions, subscription_id)
-    # Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
+    Logger.info("(#{__MODULE__}) Info - Message: #{inspect(msg)}")
 
     data = payload["result"]["data"]
 
@@ -345,8 +345,7 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(msg, state) do
-    Logger.info("(#{__MODULE__}) - Msg: #{inspect(msg)}")
-
+    Logger.error("(#{__MODULE__}) - Msg: #{inspect(msg)}")
     {:ok, state}
   end
 
