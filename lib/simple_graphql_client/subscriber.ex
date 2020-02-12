@@ -19,6 +19,12 @@ defmodule SimpleGraphqlClient.Subscriber do
     )
   end
 
+  def absinthe_unsub(query, variables) do
+    query
+    |> get_subscription_name(variables)
+    |> SubscriptionServer.unsubscribe()
+  end
+
   def get_subscription_name(query, variables) do
     @name_regex
     |> Regex.run(query)
