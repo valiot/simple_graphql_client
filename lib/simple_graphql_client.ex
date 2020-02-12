@@ -24,7 +24,7 @@ defmodule SimpleGraphqlClient do
   ```
 
   ### Subscription example
-  ```elixir 
+  ```elixir
   sub_query = "
   subscription testsub {
     userAdded{
@@ -34,7 +34,7 @@ defmodule SimpleGraphqlClient do
   "
   SimpleGraphqlClient.absinthe_subscribe(sub_query, %{}, &IO.inputs/1)
 
-  # Will produce 
+  # Will produce
   %{"userAdded" => %{"email" => "testuser@example.com"}}
   ```
 
@@ -72,7 +72,7 @@ defmodule SimpleGraphqlClient do
     * opts - url and  list of additional headers e.g for authorization
 
   ## Usage
-  ``` 
+  ```
   SimpleGraphqlClient.absinthe_subscribe(sub_query, %{}, &IO.inputs/1) # Or you can pid/name as last argumen to receive message with fulfillment data
   ```
   """
@@ -81,5 +81,10 @@ defmodule SimpleGraphqlClient do
   def absinthe_subscribe(query, variables, callback_or_dest, opts \\ []) do
     query
     |> absinthe_sub(variables, callback_or_dest, opts)
+  end
+
+  @spec absinthe_unsubscribe(binary, map) :: :ok | {:error, any}
+  def absinthe_unsubscribe(query, variables) do
+    absinthe_unsub(query, variables)
   end
 end

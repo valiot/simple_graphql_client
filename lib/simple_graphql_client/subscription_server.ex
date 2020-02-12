@@ -6,18 +6,17 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
   require Logger
   alias SimpleGraphqlClient.WebSocket
 
-  def start_link do
-    state = %{
-      socket: WebSocket,
-      subscriptions: %{},
-      queries: %{}
-    }
+  defstruct socket: WebSocket,
+            subscriptions: %{},
+            connected?: false,
+            queries: %{}
 
-    GenServer.start_link(__MODULE__, state, name: __MODULE__)
+  def start_link() do
+    GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  def init(state) do
-    {:ok, state}
+  def init([]) do
+    {:ok, %__MODULE__{}}
   end
 
   def subscribe(subscription_name, callback_or_dest, query, variables \\ []) do
@@ -27,13 +26,31 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
     )
   end
 
+  def unsubscribe(subscription_name) do
+    GenServer.cast(__MODULE__, {:unsubscribe, subscription_name})
+  end
+
+  def restart_websocket() do
+    GenServer.cast(__MODULE__, :restart_websocket)
+  end
+
+  # WIP
+  # def query(subscription_name, callback_or_dest, query, variables \\ []) do
+  #   GenServer.cast(
+  #     __MODULE__,
+  #     {:query, subscription_name, callback_or_dest, query, variables}
+  #   )
+  # end
+
   def handle_cast(
         {:subscribe, subscription_name, callback_or_dest, query, variables},
-        %{socket: socket, subscriptions: subscriptions, queries: queries} = state
+        %{socket: socket, subscriptions: subscriptions, queries: queries, connected?: connected?} =
+          state
       ) do
     actual_suscriptions = Map.keys(subscriptions)
 
-    unless subscription_name in actual_suscriptions,
+    # Sends subscription message if the websocket is connected and is a new subscription request.
+    if subscription_name not in actual_suscriptions and connected?,
       do: WebSocket.subscribe(socket, self(), subscription_name, query, variables)
 
     callbacks = Map.get(subscriptions, subscription_name, [])
@@ -44,7 +61,6 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
         else: subscriptions
 
     queries = Map.put(queries, subscription_name, [query, variables])
-    state = Map.put(state, :subscriptions, subscriptions)
 
     {:noreply, %{state | queries: queries, subscriptions: subscriptions}}
   end
@@ -63,11 +79,33 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
 
   def handle_cast(:joined, %{socket: socket, queries: queries} = state) do
     # Resend subscription request.
+    Logger.debug("(#{__MODULE__}) Resending Subscriptions")
+
     Enum.each(queries, fn {subscription_name, [query, variables]} ->
       WebSocket.subscribe(socket, self(), subscription_name, query, variables)
     end)
 
-    {:noreply, state}
+    {:noreply, %{state | connected?: true}}
+  end
+
+  def handle_cast(:disconnected, state) do
+    Logger.debug("(#{__MODULE__}) Disconnected")
+    {:noreply, %{state | connected?: false}}
+  end
+
+  def handle_cast(
+        {:unsubscribe, subscription_name},
+        %{queries: queries, subscriptions: subs, socket: socket} = state
+      ) do
+    queries = Map.drop(queries, [subscription_name])
+    subs = Map.drop(subs, [subscription_name])
+    WebSocket.unsubscribe(socket, self(), subscription_name)
+    {:noreply, %{state | queries: queries, subscriptions: subs}}
+  end
+
+  def handle_cast(:restart_websocket, %{socket: socket}) do
+    WebSocket.connection_terminate(socket, self())
+    {:noreply, %__MODULE__{}}
   end
 
   defp handle_callback_or_dest(callback_or_dest, response) do
