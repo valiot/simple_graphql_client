@@ -332,7 +332,7 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(
-        %{"payload" => %{"data" => payload}, "id" => subscription_id, "type" => "data"} = msg,
+        %{"payload" => %{"data" => payload}, "id" => subscription_id, "type" => "data"} = _msg,
         %{subscriptions: subscriptions} = state
       ) do
     #Logger.debug("(#{__MODULE__}) GQL_DATA - Message: #{inspect(msg)}")
@@ -345,7 +345,7 @@ defmodule SimpleGraphqlClient.WebSocket do
   end
 
   def handle_msg(
-        %{"payload" => payload, "id" => subscription_id, "type" => "data"} = msg,
+        %{"payload" => payload, "id" => subscription_id, "type" => "data"} = _msg,
         %{subscriptions: subscriptions} = state
       ) do
 
