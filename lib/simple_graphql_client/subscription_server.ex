@@ -15,6 +15,13 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
+  def child_spec(args) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, args}
+    }
+  end
+
   def init([]) do
     {:ok, %__MODULE__{}}
   end

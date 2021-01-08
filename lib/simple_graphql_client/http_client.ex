@@ -12,7 +12,7 @@ defmodule SimpleGraphqlClient.HttpClient do
   defp body(query, variables) do
     query
     |> create_body(variables)
-    |> Poison.encode!()
+    |> Jason.encode!()
   end
 
   defp create_body(query, nil) do

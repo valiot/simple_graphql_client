@@ -13,6 +13,7 @@ defmodule SimpleGraphqlClient.MixProject do
       package: package(),
       docs: docs(),
       source_url: @github_url,
+      xref: [exclude: :crypto],
       deps: deps()
     ]
   end
@@ -28,14 +29,14 @@ defmodule SimpleGraphqlClient.MixProject do
   defp deps do
     [
       {:httpoison, "~> 1.6"},
-      {:poison, "~> 3.1"},
-      {:websockex, "~> 0.4"},
-      {:ring_logger, "0.5.0"},
-      {:dialyxir, "~> 1.0.0-rc.3", only: [:dev], runtime: false},
-      {:credo, "~> 0.10.0", only: [:dev, :test], runtime: false},
-      {:elixir_uuid, "~> 1.2"},
+      {:jason, "~> 1.2"},
+      {:websockex,  github: "valiot/websockex"},
+      {:ring_logger, "~> 0.6"},
+      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:elixir_uuid, github: "eduardo-cunha-bose/elixir-uuid", branch: "fix-compilation-warnings"},
       {:mock, "~> 0.3.0", only: :test},
-      {:ex_doc, "~> 0.19", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false}
     ]
   end
 

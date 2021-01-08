@@ -12,7 +12,7 @@ defmodule SimpleGraphqlClient.WebSocket do
   @disconnect_sleep 30_000
 
   def start_link(args) do
-    Logger.debug("(#{__MODULE__}) Websocket Init.")
+    Logger.debug("(#{__MODULE__}) Websocket Init. #{inspect args}")
 
     ws_url = Keyword.get(args, :ws_url)
     extra_headers = Keyword.get(args, :extra_headers, [])
@@ -35,6 +35,13 @@ defmodule SimpleGraphqlClient.WebSocket do
       extra_headers: extra_headers,
       name: __MODULE__
     )
+  end
+
+  def child_spec(args) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, args}
+    }
   end
 
   def query(socket, pid, ref, query, variables \\ []) do
@@ -111,7 +118,7 @@ defmodule SimpleGraphqlClient.WebSocket do
         "type" => "connection_init",
         "payload" => connection_params
       }
-      |> Poison.encode!()
+      |> Jason.encode!()
 
     Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_INIT: #{msg}")
     {:reply, {:text, msg}, state}
@@ -133,7 +140,7 @@ defmodule SimpleGraphqlClient.WebSocket do
           "query" => query
         }
       }
-      |> Poison.encode!()
+      |> Jason.encode!()
 
     Logger.debug("(#{__MODULE__}) - GQL_START: #{msg}")
 
@@ -159,7 +166,7 @@ defmodule SimpleGraphqlClient.WebSocket do
         "id" => id,
         "type" => "stop"
       }
-      |> Poison.encode!()
+      |> Jason.encode!()
 
     Logger.debug("(#{__MODULE__}) - GQL_STOP: #{msg}")
 
@@ -173,7 +180,7 @@ defmodule SimpleGraphqlClient.WebSocket do
         {:connection_terminate, pid},
         %{protocol: "graphql-ws"} = state
       ) do
-    msg = %{"type" => "connection_terminate"} |> Poison.encode!()
+    msg = %{"type" => "connection_terminate"} |> Jason.encode!()
 
     Logger.debug("(#{__MODULE__}) - GQL_CONNECTION_TERMINATE: #{msg}")
     GenServer.cast(pid, :disconnected)
@@ -191,7 +198,7 @@ defmodule SimpleGraphqlClient.WebSocket do
         payload: %{},
         ref: msg_ref
       }
-      |> Poison.encode!()
+      |> Jason.encode!()
 
     queries = Map.put(queries, msg_ref, :join)
 
@@ -213,7 +220,7 @@ defmodule SimpleGraphqlClient.WebSocket do
         payload: %{},
         ref: msg_ref
       }
-      |> Poison.encode!()
+      |> Jason.encode!()
 
     queries = Map.put(queries, msg_ref, :heartbeat)
 
@@ -241,7 +248,7 @@ defmodule SimpleGraphqlClient.WebSocket do
         payload: doc,
         ref: msg_ref
       }
-      |> Poison.encode!()
+      |> Jason.encode!()
 
     queries = Map.put(queries, msg_ref, {:query, pid, ref})
 
@@ -269,7 +276,7 @@ defmodule SimpleGraphqlClient.WebSocket do
         payload: doc,
         ref: msg_ref
       }
-      |> Poison.encode!()
+      |> Jason.encode!()
 
     queries = Map.put(queries, msg_ref, {:subscribe, pid, subscription_name})
 
@@ -464,7 +471,7 @@ defmodule SimpleGraphqlClient.WebSocket do
   def handle_frame({:text, msg}, state) do
     msg =
       msg
-      |> Poison.decode!()
+      |> Jason.decode!()
 
     handle_msg(msg, state)
   end
