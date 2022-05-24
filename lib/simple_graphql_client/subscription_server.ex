@@ -4,7 +4,7 @@ defmodule SimpleGraphqlClient.SubscriptionServer do
   "
   use GenServer
   require Logger
-  alias SimpleGraphqlClient.WebSocket
+  alias SimpleGraphqlClient.WebSocketAdapter, as: WebSocket
 
   defstruct socket: WebSocket,
             subscriptions: %{},

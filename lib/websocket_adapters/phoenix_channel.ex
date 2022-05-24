@@ -1,6 +1,6 @@
 # original source code at https://github.com/annkissam/absinthe_websocket/blob/master/lib/absinthe_websocket/websocket.ex
 # Credentials goes to github.com/annkissam
-defmodule SimpleGraphqlClient.WebSocket do
+defmodule SimpleGraphqlClient.WebSocket.PhoenixChannel do
   @moduledoc """
    Simple genserver on top of WebSockex to handle WS stuff
   """
