@@ -1,8 +1,7 @@
-# original source code at https://github.com/annkissam/absinthe_websocket/blob/master/lib/absinthe_websocket/websocket.ex
-# Credentials goes to github.com/annkissam
 defmodule SimpleGraphqlClient.WebSocket.GraphqlWs do
   @moduledoc """
-   Simple genserver on top of WebSockex to handle WS stuff
+    GraphQL over WebSocket Protocol
+    https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
   """
   require Logger
 
