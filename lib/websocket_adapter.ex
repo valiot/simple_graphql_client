@@ -19,9 +19,6 @@ defmodule SimpleGraphqlClient.WebSocketAdapter do
               subscription_server: nil
   end
 
-  @heartbeat_sleep 30_000
-  @disconnect_sleep 30_000
-
   def start_link(args) do
     Logger.debug("(#{__MODULE__}) Websocket Init. #{inspect(args)}")
 
