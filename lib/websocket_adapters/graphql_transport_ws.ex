@@ -29,12 +29,12 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
 
     :timer.sleep(@disconnect_sleep)
 
-    {:reconnect, %{state | subscriptions: %{}, ping_timer: nil, pong_timer: nil}}
+    {:reconnect, %{state | subscriptions: %{}, ping_timer: nil, pong_timers: []}}
   end
 
   # Client messages (graphql-transport-ws)
 
-  #  ConnectionInit
+  # ConnectionInit
   def handle_cast(:connection_init, %{connection_params: connection_params} = state) do
     msg =
       %{
@@ -47,7 +47,7 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
     {:reply, {:text, msg}, state}
   end
 
-  #  Subscribe
+  # Subscribe
   def handle_cast(
         {:subscribe, {pid, subscription_name, query, variables}},
         %{msg_ref: msg_ref} = state
@@ -73,13 +73,14 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
   end
 
   # Ping
-  def handle_cast(:ping, state) do
+  def handle_cast(:ping, %{pong_timers: pong_timers} = state) do
     pong_timer = Process.send_after(self(), :pong, @pong_sleep)
-    Logger.debug("(#{__MODULE__}) - Ping: #{inspect(pong_timer)}")
-    {:reply, {:text, Jason.encode!(%{"type" => "ping"})}, %{state | pong_timer: pong_timer}}
+    msg = Jason.encode!(%{"type" => "ping"})
+    Logger.debug("(#{__MODULE__}) - Ping")
+    {:reply, {:text, msg}, %{state | pong_timers: pong_timers ++ [pong_timer]}}
   end
 
-  #  Complete
+  # Complete
   def handle_cast(
         {:stop, {pid, subscription_name}},
         %{subscriptions: subscriptions} = state
@@ -100,21 +101,28 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
     {:reply, {:text, msg}, %{state | subscriptions: subscriptions}}
   end
 
+  # Pong Timeout
+  def handle_cast(:pong_timeout, %{subscription_server: subscription_server} = state) do
+    GenServer.cast(subscription_server, :disconnected)
+
+    :timer.sleep(@disconnect_sleep)
+
+    {:close, state}
+  end
+
   def handle_cast(message, state) do
     Logger.info("(#{__MODULE__}) - Cast: #{inspect(message)}")
     {:noreply, state}
   end
 
-  def handle_info(:pong,  %{subscription_server: subscription_server} = state) do
+  def handle_info(:pong, %{socket: socket} = state) do
     Logger.warn("(#{__MODULE__}) - Pong Timeout")
 
     clean_all_timers(state)
 
-    GenServer.cast(subscription_server, :disconnected)
+    WebSockex.cast(socket, :pong_timeout)
 
-    :timer.sleep(@disconnect_sleep)
-
-    {:reconnect, %{state | subscriptions: %{}, ping_timer: nil, pong_timer: nil}}
+    {:ok, %{state | subscriptions: %{}, ping_timer: nil, pong_timers: []}}
   end
 
   def handle_info(:ping, %{socket: socket} = state) do
@@ -136,16 +144,20 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
   # ConnectionAck
   def handle_msg(%{"type" => "connection_ack"}, state) do
     GenServer.cast(state.subscription_server, :joined)
+
     Logger.debug("(#{__MODULE__}) - ConnectionAck")
+
     {:ok, state}
   end
 
   # Pong
-  def handle_msg(%{"type" => "pong"}, %{pong_timer: pong_timer} = state)
-      when not is_nil(pong_timer) do
+  def handle_msg(%{"type" => "pong"}, %{pong_timers: pong_timers} = state)
+      when pong_timers != [] do
     Logger.debug("(#{__MODULE__}) - Pong")
-    Process.cancel_timer(pong_timer)
-    {:ok, %{state | pong_timer: nil}}
+
+    clean_pong_timers(pong_timers)
+
+    {:ok, %{state | pong_timers: []}}
   end
 
   def handle_msg(%{"type" => "pong"}, state) do
@@ -154,7 +166,6 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
   end
 
   # Next
-
   def handle_msg(
         %{"payload" => %{"data" => payload}, "id" => subscription_id, "type" => "data"} = _msg,
         %{subscriptions: subscriptions} = state
@@ -210,8 +221,12 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
     {:ok, state}
   end
 
-  defp clean_all_timers(%{ping_timer: ping_timer, pong_timer: pong_timer}) do
-    for timer <- [ping_timer, pong_timer], not is_nil(timer), do: Process.cancel_timer(timer)
+  defp clean_all_timers(%{ping_timer: ping_timer, pong_timers: pong_timers}) do
+    for timer <- [ping_timer] ++ pong_timers, not is_nil(timer), do: Process.cancel_timer(timer)
+  end
+
+  defp clean_pong_timers(pong_timers) do
+    for timer <- pong_timers, do: Process.cancel_timer(timer)
   end
 
   defp get_id(subscriptions, key) do

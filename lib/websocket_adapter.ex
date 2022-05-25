@@ -16,7 +16,7 @@ defmodule SimpleGraphqlClient.WebSocketAdapter do
               msg_ref: 0,
               heartbeat_timer: nil,
               ping_timer: nil,
-              pong_timer: nil,
+              pong_timers: [],
               socket: nil,
               subscription_server: nil
   end
