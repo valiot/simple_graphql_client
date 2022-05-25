@@ -15,6 +15,8 @@ defmodule SimpleGraphqlClient.WebSocketAdapter do
               queries: %{},
               msg_ref: 0,
               heartbeat_timer: nil,
+              ping_timer: nil,
+              pong_timer: nil,
               socket: nil,
               subscription_server: nil
   end
@@ -79,6 +81,10 @@ defmodule SimpleGraphqlClient.WebSocketAdapter do
 
   def handle_cast(cast_msg, %{protocol_handler: protocol_handler} = state),
     do: protocol_handler.handle_cast(cast_msg, state)
+
+  def handle_info(info_msg, %{protocol_handler: protocol_handler} = state),
+    do: protocol_handler.handle_info(info_msg, state)
+
 
   def handle_frame({:text, msg}, state) do
     msg =
