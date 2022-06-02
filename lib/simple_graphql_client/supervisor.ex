@@ -4,7 +4,7 @@ defmodule SimpleGraphqlClient.Supervisor do
   """
   use Supervisor
   alias SimpleGraphqlClient.SubscriptionServer
-  alias SimpleGraphqlClient.WebSocket
+  alias SimpleGraphqlClient.WebSocketAdapter, as: WebSocket
 
   def start_link(args \\ []) do
     Supervisor.start_link(__MODULE__, args, name: :simple_graphql_client_supervisor)
@@ -18,7 +18,7 @@ defmodule SimpleGraphqlClient.Supervisor do
     children = [
       {SubscriptionServer, []},
       {
-        WebSocket, 
+        WebSocket,
         [[ws_url: ws_url, extra_headers: extra_headers, connection_params: connection_params]]
       }
     ]
