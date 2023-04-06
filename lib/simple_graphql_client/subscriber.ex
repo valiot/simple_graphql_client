@@ -26,10 +26,14 @@ defmodule SimpleGraphqlClient.Subscriber do
   end
 
   def get_subscription_name(query, variables) do
-    @name_regex
-    |> Regex.run(query)
-    |> List.first()
-    |> interpolate_variables(variables)
+    with matches <- Regex.run(@name_regex, query),
+         false <- is_nil(matches),
+         first_match <- List.first(matches) do
+      interpolate_variables(first_match, variables)
+    else
+      _error ->
+        ""
+    end
   end
 
   defp interpolate_variables(name, variables) do

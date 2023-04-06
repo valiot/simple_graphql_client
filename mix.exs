@@ -28,15 +28,14 @@ defmodule SimpleGraphqlClient.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:httpoison, "~> 1.6"},
-      {:jason, "~> 1.2"},
+      {:httpoison, "~> 2.1"},
+      {:jason, "~> 1.4"},
       {:websockex,  github: "valiot/websockex"},
-      {:ring_logger, "~> 0.6"},
+      {:ring_logger, "~> 0.9"},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
-      {:elixir_uuid, github: "eduardo-cunha-bose/elixir-uuid", branch: "fix-compilation-warnings"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mock, "~> 0.3.0", only: :test},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.27", only: :dev, runtime: false}
     ]
   end
 

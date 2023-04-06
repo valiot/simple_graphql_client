@@ -34,7 +34,7 @@ defmodule SimpleGraphqlClientTest do
 
     test "creates correct request with all parameters passs", %{url: url} do
       with_mock HTTPoison,
-        post: fn _api_url, _body, _headers ->
+        post: fn api_url, body, headers ->
           @mock
         end do
         resp =
@@ -44,14 +44,14 @@ defmodule SimpleGraphqlClientTest do
           )
 
         body =
-          "{\"variables\":{\"name\":\"Boris\"},\"query\":\"  query users($name: String){\\n    users(name: $name){\\n      name\\n    }\\n  }\\n\"}"
+          "{\"query\":\"  query users($name: String){\\n    users(name: $name){\\n      name\\n    }\\n  }\\n\",\"variables\":{\"name\":\"Boris\"}}"
 
         headers = [{"Content-Type", "application/json"}, token: "1234"]
         assert_called(HTTPoison.post(url, body, headers))
 
         assert {:ok,
                 %SimpleGraphqlClient.Response{
-                  body: {:ok, %{"data" => %{"users" => []}}},
+                  body: %{"data" => %{"users" => []}},
                   headers: [],
                   status_code: 200
                 }} == resp
@@ -73,7 +73,7 @@ defmodule SimpleGraphqlClientTest do
 
         assert {:ok,
                 %SimpleGraphqlClient.Response{
-                  body: {:ok, %{"data" => %{"users" => []}}},
+                  body: %{"data" => %{"users" => []}},
                   headers: [],
                   status_code: 200
                 }} == resp
