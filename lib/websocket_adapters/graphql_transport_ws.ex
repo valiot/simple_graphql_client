@@ -116,7 +116,7 @@ defmodule SimpleGraphqlClient.WebSocket.GraphqlTransportWs do
   end
 
   def handle_info(:pong, %{socket: socket} = state) do
-    Logger.warn("(#{__MODULE__}) - Pong Timeout")
+    Logger.warning("(#{__MODULE__}) - Pong Timeout")
 
     clean_all_timers(state)
 
