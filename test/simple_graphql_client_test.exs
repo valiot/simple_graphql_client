@@ -32,22 +32,23 @@ defmodule SimpleGraphqlClientTest do
       {:ok, %{url: "www.example.com/api"}}
     end
 
-    test "creates correct request with all parameters passs", %{url: url} do
+    test "creates correct request with all parameters pass", %{url: url} do
       with_mock HTTPoison,
-        post: fn api_url, body, headers ->
+        post: fn _api_url, _body, _headers, _options ->
           @mock
         end do
         resp =
           SimpleGraphqlClient.graphql_request(@query, %{name: "Boris"},
             headers: [token: "1234"],
-            url: url
+            url: url,
+            http_options: [timeout: 1000]
           )
 
         body =
-          "{\"query\":\"  query users($name: String){\\n    users(name: $name){\\n      name\\n    }\\n  }\\n\",\"variables\":{\"name\":\"Boris\"}}"
+          "{\"variables\":{\"name\":\"Boris\"},\"query\":\"  query users($name: String){\\n    users(name: $name){\\n      name\\n    }\\n  }\\n\"}"
 
-        headers = [{"Content-Type", "application/json"}, token: "1234"]
-        assert_called(HTTPoison.post(url, body, headers))
+        headers = [{"Content-Type", "application/json"}, {:token, "1234"}]
+        assert_called(Elixir.HTTPoison.post(url, body, headers, [timeout: 1000]))
 
         assert {:ok,
                 %SimpleGraphqlClient.Response{
@@ -60,7 +61,7 @@ defmodule SimpleGraphqlClientTest do
 
     test "creates correct request with only a query", %{url: url} do
       with_mock HTTPoison,
-        post: fn _api_url, _body, _headers ->
+        post: fn _api_url, _body, _headers, _options ->
           @mock
         end do
         resp = SimpleGraphqlClient.graphql_request(@query, nil, url: url)
@@ -69,7 +70,7 @@ defmodule SimpleGraphqlClientTest do
           "{\"query\":\"  query users($name: String){\\n    users(name: $name){\\n      name\\n    }\\n  }\\n\"}"
 
         headers = [{"Content-Type", "application/json"}]
-        assert_called(HTTPoison.post(url, body, headers))
+        assert_called(HTTPoison.post(url, body, headers, []))
 
         assert {:ok,
                 %SimpleGraphqlClient.Response{

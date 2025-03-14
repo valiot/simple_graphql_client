@@ -6,7 +6,7 @@ defmodule SimpleGraphqlClient.HttpClient do
   """
 
   def send_request(query, variables \\ nil, opts \\ []) do
-    HTTPoison.post(api_url(opts), body(query, variables), headers(opts))
+    HTTPoison.post(api_url(opts), body(query, variables), headers(opts), http_options(opts))
   end
 
   defp body(query, variables) do

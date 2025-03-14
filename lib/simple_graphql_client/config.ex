@@ -15,6 +15,10 @@ defmodule SimpleGraphqlClient.Config do
     @default_headers ++ (Keyword.get(opts, :headers) || [])
   end
 
+  def http_options(opts) do
+    Keyword.get(opts, :http_options, [])
+  end
+
   defp required_url(opts, key) do
     Keyword.get(opts, key) || raise "Please pass #{key} it in opts"
   end

@@ -10,17 +10,16 @@ defmodule SimpleGraphqlClient do
   ## Usage
   ### Query/Mutation example
   ```elixir
-  iex>
-  query = "query users($name: String){users(name: $name){name}}"
-  SimpleGraphqlClient.graphql_request(query, %{name: "Boris"})
+  # query = "query users($name: String){users(name: $name){name}}"
+  # SimpleGraphqlClient.graphql_request(query, %{name: "Boris"}, url: "http://example.com/graphql")
   # Will produce
-  {:ok,
-    %SimpleGraphqlClient.Response{
-      body: {:ok, %{"data" => %{"users" => []}}},
-      headers: [],
-      status_code: 200
-    }
-  }
+  # {:ok,
+  #   %SimpleGraphqlClient.Response{
+  #     body: %{"data" => %{"users" => []}},
+  #     headers: [],
+  #     status_code: 200
+  #   }
+  # }
   ```
 
   ### Subscription example
