@@ -1,6 +1,6 @@
 defmodule SimpleGraphqlClient.MixProject do
   use Mix.Project
-  @version "0.2.1"
+  @version "0.3.0"
   @github_url "https://github.com/gen1321/simple_graphql_client"
 
   def project do
